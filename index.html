@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Interactive Bézier Rope</title>
+<style>
+  body { margin: 0; background: #0f0f0f; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<script>
+/* ===========================
+   Setup
+=========================== */
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+/* ===========================
+   Vector Utilities
+=========================== */
+class Vec {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.vx = 0;
+    this.vy = 0;
+  }
+}
+
+/* ===========================
+   Control Points
+=========================== */
+const P0 = new Vec(100, canvas.height / 2);
+const P3 = new Vec(canvas.width - 100, canvas.height / 2);
+
+const P1 = new Vec(canvas.width / 2 - 150, canvas.height / 2);
+const P2 = new Vec(canvas.width / 2 + 150, canvas.height / 2);
+
+let target = { x: canvas.width / 2, y: canvas.height / 2 };
+
+/* ===========================
+   Physics Parameters
+=========================== */
+const k = 0.02;       // spring constant
+const damping = 0.85;
+
+/* ===========================
+   Mouse Input
+=========================== */
+canvas.addEventListener("mousemove", e => {
+  target.x = e.clientX;
+  target.y = e.clientY;
+});
+
+/* ===========================
+   Bézier Math
+=========================== */
+function bezierPoint(t, p0, p1, p2, p3) {
+  const u = 1 - t;
+  return {
+    x: u*u*u*p0.x + 3*u*u*t*p1.x + 3*u*t*t*p2.x + t*t*t*p3.x,
+    y: u*u*u*p0.y + 3*u*u*t*p1.y + 3*u*t*t*p2.y + t*t*t*p3.y
+  };
+}
+
+function bezierTangent(t, p0, p1, p2, p3) {
+  const u = 1 - t;
+  return {
+    x: 3*u*u*(p1.x - p0.x) + 6*u*t*(p2.x - p1.x) + 3*t*t*(p3.x - p2.x),
+    y: 3*u*u*(p1.y - p0.y) + 6*u*t*(p2.y - p1.y) + 3*t*t*(p3.y - p2.y)
+  };
+}
+
+/* ===========================
+   Physics Update
+=========================== */
+function updateSpring(p, tx, ty) {
+  const ax = -k * (p.x - tx);
+  const ay = -k * (p.y - ty);
+  p.vx = (p.vx + ax) * damping;
+  p.vy = (p.vy + ay) * damping;
+  p.x += p.vx;
+  p.y += p.vy;
+}
+
+/* ===========================
+   Rendering
+=========================== */
+function drawPoint(p, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw Bézier curve
+  ctx.strokeStyle = "#00ffcc";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let t = 0; t <= 1; t += 0.01) {
+    const p = bezierPoint(t, P0, P1, P2, P3);
+    t === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+  }
+  ctx.stroke();
+
+  // Draw tangents
+  ctx.strokeStyle = "#ffaa00";
+  for (let t = 0; t <= 1; t += 0.1) {
+    const p = bezierPoint(t, P0, P1, P2, P3);
+    const tan = bezierTangent(t, P0, P1, P2, P3);
+    const len = Math.hypot(tan.x, tan.y);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x + (tan.x / len) * 30, p.y + (tan.y / len) * 30);
+    ctx.stroke();
+  }
+
+  // Control points
+  drawPoint(P0, "#ffffff");
+  drawPoint(P3, "#ffffff");
+  drawPoint(P1, "#ff4444");
+  drawPoint(P2, "#ff4444");
+}
+
+/* ===========================
+   Animation Loop
+=========================== */
+function animate() {
+  updateSpring(P1, target.x - 120, target.y);
+  updateSpring(P2, target.x + 120, target.y);
+
+  draw();
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+
+</body>
+</html>
